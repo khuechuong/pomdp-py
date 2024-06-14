@@ -65,9 +65,11 @@ cdef class QNode(TreeNode):
         self.value = value
         self.children = {}  # o -> VNode
     def __str__(self):
-        return typ.red("QNode") + "(%.3f, %.3f | %s)" % (self.num_visits,
-                                                         self.value,
-                                                         str(self.children.keys()))
+        return typ.red("QNode") + "(%.3f, %.3f)" % (self.num_visits,
+                                                         self.value)
+        # return typ.red("QNode") + "(%.3f, %.3f | %s)" % (self.num_visits,
+        #                                                  self.value,
+        #                                                  str(self.children.keys()))
     def __repr__(self):
         return self.__str__()
 
@@ -76,9 +78,11 @@ cdef class VNode(TreeNode):
         self.num_visits = num_visits
         self.children = {}  # a -> QNode
     def __str__(self):
-        return typ.green("VNode") + "(%.3f, %.3f | %s)" % (self.num_visits,
-                                                           self.value,
-                                                           str(self.children.keys()))
+        return typ.green("VNode") + "(%.3f, %.3f)" % (self.num_visits,
+                                                           self.value)
+        # return typ.green("VNode") + "(%.3f, %.3f | %s)" % (self.num_visits,
+        #                                                    self.value,
+        #                                                    str(self.children.keys()))
     def __repr__(self):
         return self.__str__()
 
@@ -256,8 +260,10 @@ cdef class POUCT(Planner):
                              "or pass in a rollout_policy upon initialization")
 
         self._agent = agent   # switch focus on planning for the given agent
+        # add tree attribute
         if not hasattr(self._agent, "tree"):
             self._agent.add_attr("tree", None)
+        # search creates the tree
         action, time_taken, sims_count = self._search()
         self._last_num_sims = sims_count
         self._last_planning_time = time_taken
@@ -324,6 +330,7 @@ cdef class POUCT(Planner):
 
         while not self._should_stop(sims_count, start_time):
             state = self._agent.sample_belief()
+            print(state)
             self._perform_simulation(state)
             sims_count += 1
             self._update_progress(pbar, sims_count, start_time)
@@ -338,7 +345,29 @@ cdef class POUCT(Planner):
             total = self._num_sims if self._num_sims > 0 else self._planning_time
             return tqdm(total=total)
 
+    cpdef tree(self, node, k, prefix):    
+        if node is None:
+            return
+        if node.num_visits == 0 and node.value ==0:
+            return
+        """ name of node    """
+        if k is not None:
+            k = k.name
+        else:
+            k = ""
+        if type(node) == VNode or type(node) == RootVNode:       
+            st = typ.green("VNode") + "(%.3f, %.3f)" % (node.num_visits, node.value)
+            print("{0} {1} {2}".format(prefix, typ.green(k), st))
+        else:
+            print("{0} {1} {2}".format(prefix, typ.red(k), node))
+        if len(node.children) ==0:
+            return
+        for key in node.children.keys():
+            self.tree(node.children.get(key), key, prefix+ '  -')
+
     cpdef _perform_simulation(self, state):
+        print("tree: ", self._agent.tree)
+        self.tree(self._agent.tree, None, "")
         self._simulate(state, self._agent.history, self._agent.tree, None, None, 0)
 
     cdef bint _should_stop(self, int sims_count, double start_time):
