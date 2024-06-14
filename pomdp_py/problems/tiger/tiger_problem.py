@@ -241,6 +241,27 @@ class TigerProblem(pomdp_py.POMDP):
         tiger_problem.agent.set_belief(init_belief, prior=True)
         return tiger_problem
 
+def tree(node, k = None,prefix=""):
+    
+    if node is None:
+        return
+    if node.num_visits == 0 and node.value ==0:
+        return
+    """ name of node    """
+    if k is not None:
+        k = k.name
+    else:
+        k = ""
+    from pomdp_py.utils import typ
+    if type(node) == pomdp_py.algorithms.po_uct.VNode or type(node) == pomdp_py.algorithms.po_uct.RootVNode:       
+        st = typ.green("VNode") + "(%.3f, %.3f)" % (node.num_visits, node.value)
+        print("{0} {1} {2}".format(prefix, typ.green(k), st))
+    else:
+        print("{0} {1} {2}".format(prefix, typ.red(k), node))
+    if len(node.children) ==0:
+        return
+    for key in node.children.keys():
+        tree(node.children.get(key), key, prefix+ '  -')
 
 def test_planner(tiger_problem, planner, nsteps=3, debug_tree=False):
     """
@@ -255,8 +276,13 @@ def test_planner(tiger_problem, planner, nsteps=3, debug_tree=False):
     """
     for i in range(nsteps):
         action = planner.plan(tiger_problem.agent)
+        # for key in tiger_problem.agent.tree.children.keys():
+        #     print(tiger_problem.agent.tree.children.get(key))
+        # tree(tiger_problem.agent.tree)
+        return
         if debug_tree:
             from pomdp_py.utils import TreeDebugger
+            TreeDebugger(tiger_problem.agent.tree).pp
 
         print("==== Step %d ====" % (i + 1))
         print(f"True state: {tiger_problem.env.state}")
@@ -313,6 +339,7 @@ def test_planner(tiger_problem, planner, nsteps=3, debug_tree=False):
             # Make it clearer to see what actions are taken
             # until every time door is opened.
             print("\n")
+            return
 
 
 def make_tiger(noise=0.15, init_state="tiger-left", init_belief=[0.5, 0.5]):
@@ -336,44 +363,45 @@ def main():
     init_belief = pomdp_py.Histogram(
         {TigerState("tiger-left"): 0.5, TigerState("tiger-right"): 0.5}
     )
+    
     tiger = make_tiger(init_state=init_true_state)
     init_belief = tiger.agent.belief
 
-    print("** Testing value iteration **")
-    vi = pomdp_py.ValueIteration(horizon=3, discount_factor=0.95)
-    test_planner(tiger, vi, nsteps=3)
+    # print("** Testing value iteration **")
+    # vi = pomdp_py.ValueIteration(horizon=3, discount_factor=0.95)
+    # test_planner(tiger, vi, nsteps=3)
 
     print("\n** Testing POUCT **")
     pouct = pomdp_py.POUCT(
         max_depth=3,
         discount_factor=0.95,
-        num_sims=4096,
+        num_sims=20,#4096,
         exploration_const=50,
         rollout_policy=tiger.agent.policy_model,
         show_progress=True,
     )
-    test_planner(tiger, pouct, nsteps=10)
+    test_planner(tiger, pouct, nsteps=10, debug_tree=True)
     TreeDebugger(tiger.agent.tree).pp
 
     # Reset agent belief
     tiger.agent.set_belief(init_belief, prior=True)
     tiger.agent.tree = None
 
-    print("** Testing POMCP **")
-    tiger.agent.set_belief(
-        pomdp_py.Particles.from_histogram(init_belief, num_particles=100), prior=True
-    )
-    pomcp = pomdp_py.POMCP(
-        max_depth=3,
-        discount_factor=0.95,
-        num_sims=1000,
-        exploration_const=50,
-        rollout_policy=tiger.agent.policy_model,
-        show_progress=True,
-        pbar_update_interval=500,
-    )
-    test_planner(tiger, pomcp, nsteps=10)
-    TreeDebugger(tiger.agent.tree).pp
+    # print("** Testing POMCP **")
+    # tiger.agent.set_belief(
+    #     pomdp_py.Particles.from_histogram(init_belief, num_particles=100), prior=True
+    # )
+    # pomcp = pomdp_py.POMCP(
+    #     max_depth=3,
+    #     discount_factor=0.95,
+    #     num_sims=1000,
+    #     exploration_const=50,
+    #     rollout_policy=tiger.agent.policy_model,
+    #     show_progress=True,
+    #     pbar_update_interval=500,
+    # )
+    # test_planner(tiger, pomcp, nsteps=10)
+    # TreeDebugger(tiger.agent.tree).pp
 
 
 if __name__ == "__main__":
