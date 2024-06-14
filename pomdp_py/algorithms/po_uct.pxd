@@ -33,6 +33,7 @@ cdef class POUCT(Planner):
 
     cpdef _search(self)
     cdef _initialize_progress_bar(self)
+    cpdef tree(self,node, k, prefix)
     cpdef _perform_simulation(self, state)
     cdef bint _should_stop(self, int sims_count, double start_time)
     cdef _update_progress(self, pbar, int sims_count, double start_time)
